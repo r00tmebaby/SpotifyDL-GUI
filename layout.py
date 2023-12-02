@@ -22,7 +22,7 @@ download_settings_tab = sg.Tab(
                             ],
                             key="AUDIO_SOURCE",
                             readonly=True,
-                            default_value="youtube",
+                            default_value="youtube-music",
                             size=(20, 1),
                         ),
                         sg.Text("Lyrics Source:"),

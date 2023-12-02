@@ -1,3 +1,32 @@
+"""
+SpotifyDL-GUI: A Python-based Graphical User Interface for Downloading Spotify Playlists
+
+This program, SpotifyDL-GUI, leverages the power of Python and PySimpleGUI to provide an intuitive and user-friendly interface for downloading Spotify playlists. It's designed to simplify the process of downloading songs from Spotify, offering a range of customizable options such as selecting the audio source, lyrics source, format, bitrate, and more. The application also integrates with external tools like FFmpeg to handle media file conversions.
+
+Key Features:
+- Download Spotify playlists through a simple and interactive GUI.
+- Choose from multiple audio and lyrics sources including YouTube, SoundCloud, and others.
+- Customize download settings like format, bitrate, and output directory.
+- Progress tracking with a real-time updating progress bar.
+- Advanced settings for filtering results, headless operation, and cache management.
+- Logging tab for monitoring download processes and actions.
+
+The program's main GUI loop handles user interactions, capturing input data and triggering appropriate actions based on user choices. It uses threading to ensure the UI remains responsive during downloads. The `exec_command` function is a core component that executes external commands and manages output for both downloading and non-downloading processes.
+
+Usage:
+Run the script and interact with the GUI to choose playlists and download settings. The program will handle the rest, providing updates and logs directly within the GUI.
+
+Dependencies:
+- PySimpleGUI for the graphical interface.
+- spotdl and FFmpeg for handling Spotify playlist downloading and media file processing.
+
+This script represents a convenient solution for music enthusiasts looking to download and manage their Spotify playlists with ease.
+
+Author: Zdravko Georgiev
+Version: 0.0.1
+Date: 12.02.2023
+"""
+
 import os
 import subprocess
 import threading
@@ -5,7 +34,22 @@ import threading
 from layout import sg, window
 
 
-def exec_command(commands: str, output_file, window, dl: bool = True):
+def exec_command(commands: str, output_file, windows: sg.Window, dl: bool = True) -> None:
+    """
+    Executes a given command in a subprocess and handles output.
+
+    This function executes a specified command using the subprocess module. It captures the command's output and writes it to a specified file. If the 'dl' parameter is True, it specifically handles downloading processes, updating a progress bar in the GUI and managing the download state. For non-downloading processes (when 'dl' is False), it simply writes the command output to the file.
+
+    Parameters:
+
+    :param commands: (str) The command to be executed in the subprocess.
+    :param output_file: The file path where the command's output will be written.
+    :param windows: (sg.Window): The PySimpleGUI window object used for updating the GUI elements.
+    :param dl: (bool, optional) A flag to indicate whether the command is for downloading (True) or a general command (False). Defaults to True.
+
+    Returns:
+    - None
+    """
     process = subprocess.Popen(
         commands,
         shell=True,
@@ -31,7 +75,7 @@ def exec_command(commands: str, output_file, window, dl: bool = True):
                 if "Downloaded" in line or "Skipping" in line:
                     num_songs_downloaded += 1
                     line = f"{num_songs_downloaded}. {line}"
-                    window["PROGRESS_BAR"].update_bar(
+                    windows["PROGRESS_BAR"].update_bar(
                         num_songs_downloaded
                     )  # Update the progress bar
 
@@ -39,7 +83,7 @@ def exec_command(commands: str, output_file, window, dl: bool = True):
                 file.flush()
                 if total_songs and num_songs_downloaded == total_songs:
                     file.write(f"\nDownloaded successfully {total_songs} songs.")
-                    window["-download-"].update(disabled=False)
+                    windows["-download-"].update(disabled=False)
                     process.terminate()
                     break
     else:
@@ -54,7 +98,7 @@ def exec_command(commands: str, output_file, window, dl: bool = True):
     process.wait()
 
 
-def main_gui():
+def main_gui() -> None:
     output_file = "command_output.txt"  # Define the output file
     if os.path.isfile(output_file):
         os.remove(output_file)
