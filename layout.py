@@ -1,8 +1,13 @@
 import os
+from pathlib import Path
 
 import PySimpleGUI as sg
 
 sg.theme("Default1")
+
+download_dir = os.path.join(os.path.expanduser("~"), "Downloads")
+Path(download_dir).mkdir(exist_ok=True, parents=True)
+
 download_settings_tab = sg.Tab(
     "Download Settings",
     [
@@ -30,6 +35,7 @@ download_settings_tab = sg.Tab(
                             ["genius", "musixmatch", "azlyrics", "synced"],
                             key="LYRICS_SOURCE",
                             readonly=True,
+                            default_value="genius",
                             size=(20, 1),
                         ),
                     ],
@@ -75,13 +81,6 @@ download_settings_tab = sg.Tab(
                         sg.InputText(key="FFMPEG_ARGS", expand_x=True),
                     ],
                     [
-                        sg.Text("Threads:"),
-                        sg.Spin(
-                            [i for i in range(1, os.cpu_count() + 1)],
-                            initial_value=os.cpu_count(),
-                            key="THREADS",
-                            size=(2, 1),
-                        ),
                         sg.Text("Log Level:"),
                         sg.Combo(
                             [
@@ -226,7 +225,7 @@ layout = [
                     sg.InputText(
                         key="OUTPUT-DIRECTORY",
                         expand_x=True,
-                        default_text="Download",
+                        default_text=download_dir,
                     ),
                     sg.FolderBrowse(),
                 ],
@@ -247,6 +246,7 @@ layout = [
                         [
                             [
                                 sg.Button("Download", key="-download-"),
+                                sg.Button("Stop", key="-stop-", disabled=True),
                                 sg.Button("Install/Check FFmpeg"),
                             ]
                         ],
@@ -259,7 +259,7 @@ layout = [
 ]
 
 window = sg.Window(
-    title="Spotify Playlist Downloader v.0.0.1",
+    title="Spotify Playlist Downloader v.0.0.2",
     icon="statics/spotify.ico",
     layout=layout,
 )

@@ -30,72 +30,91 @@ Date: 12.02.2023
 import os
 import subprocess
 import threading
+from pathlib import Path
 
 from layout import sg, window
 
+current_process = None
 
-def exec_command(commands: str, output_file, windows: sg.Window, dl: bool = True) -> None:
+
+def exec_command(
+    commands: str, output_file, windows: sg.Window, dl: bool = True,
+) -> None:
     """
     Executes a given command in a subprocess and handles output.
 
-    This function executes a specified command using the subprocess module. It captures the command's output and writes it to a specified file. If the 'dl' parameter is True, it specifically handles downloading processes, updating a progress bar in the GUI and managing the download state. For non-downloading processes (when 'dl' is False), it simply writes the command output to the file.
+    This function executes a specified command using the subprocess module.
+    It captures the command's output and writes it to a specified file.
+    If the 'dl' parameter is True, it specifically handles downloading processes,
+    updating a progress bar in the GUI and managing the download state.
+    For non-downloading processes (when 'dl' is False), it simply writes the command output to the file.
 
     Parameters:
 
     :param commands: (str) The command to be executed in the subprocess.
     :param output_file: The file path where the command's output will be written.
     :param windows: (sg.Window): The PySimpleGUI window object used for updating the GUI elements.
-    :param dl: (bool, optional) A flag to indicate whether the command is for downloading (True) or a general command (False). Defaults to True.
+    :param dl: (bool, optional) A flag to indicate whether the command
+        is for downloading (True) or a general command (False). Defaults to True.
 
     Returns:
     - None
     """
-    process = subprocess.Popen(
-        commands,
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        stdin=subprocess.PIPE,
-        text=True,
-        encoding="cp1251",
-        universal_newlines=True,
-    )
-    if dl:
-        num_songs_downloaded = 0
-        total_songs = None
-        window["-download-"].update(disabled=True)
-        with open(output_file, "a", encoding="cp1251") as file:
-            for line in process.stdout:
-                if "Found" in line and "songs" in line:
-                    total_songs = int(line.split()[1])
-                    window["PROGRESS_BAR"].update_bar(
-                        0, total_songs
-                    )  # Initialize the progress bar
-                # Prepend number to 'Downloaded' lines
-                if "Downloaded" in line or "Skipping" in line:
-                    num_songs_downloaded += 1
-                    line = f"{num_songs_downloaded}. {line}"
-                    windows["PROGRESS_BAR"].update_bar(
-                        num_songs_downloaded
-                    )  # Update the progress bar
+    global current_process
+    try:
+        current_process = subprocess.Popen(
+            commands,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            universal_newlines=True,
+        )
+        if dl:
+            num_songs_downloaded = 0
+            total_songs = None
+            windows["-download-"].update(disabled=True)
+            windows["-stop-"].update(disabled=False)
+            with open(output_file, "a", encoding="utf-8") as file:
+                for line in current_process.stdout:
+                    if "Found" in line and "songs" in line:
+                        total_songs = int(line.split()[1]) - 1
+                        windows["PROGRESS_BAR"].update_bar(
+                            0, total_songs
+                        )  # Initialize the progress bar
+                    # Prepend number to 'Downloaded' lines
+                    if "Downloaded" in line or "Skipping" in line:
+                        num_songs_downloaded += 1
+                        line = f"{num_songs_downloaded}. {line}"
+                        windows["PROGRESS_BAR"].update_bar(
+                            num_songs_downloaded
+                        )  # Update the progress bar
 
-                file.write(line)
-                file.flush()
-                if total_songs and num_songs_downloaded == total_songs:
-                    file.write(f"\nDownloaded successfully {total_songs} songs.")
-                    windows["-download-"].update(disabled=False)
-                    process.terminate()
-                    break
-    else:
-        with open(output_file, "a") as file:
-            process.stdin.write("y\n")
-            process.stdin.flush()
+                    file.write(line)
+                    file.flush()
+                    if total_songs and num_songs_downloaded == total_songs:
+                        file.write(f"\nDownloaded successfully {total_songs} songs.")
+                        windows["-download-"].update(disabled=False)
+                        current_process.terminate()
+                        break
+        else:
+            with open(output_file, "a") as file:
+                current_process.stdin.write("y\n")
+                current_process.stdin.flush()
 
-            for line in iter(process.stdout.readline, ""):
-                file.write(line)
-                file.flush()
+                for line in iter(current_process.stdout.readline, ""):
+                    file.write(line)
+                    file.flush()
 
-    process.wait()
+        current_process.wait()
+    except threading.ThreadError as e:
+        windows["OUTPUT"].print(f"Error: {e}\n")
+        windows["-stop-"].update(disabled=True)
+    finally:
+        current_process = None
+        windows["-stop-"].update(disabled=True)
 
 
 def main_gui() -> None:
@@ -108,6 +127,15 @@ def main_gui() -> None:
 
         if event == sg.WIN_CLOSED or event == "Exit":
             break
+        elif event == "-stop-":
+            if current_process is not None:
+                current_process.terminate()
+                current_process.wait()
+                window["-download-"].update(disabled=False)
+                window["-stop-"].update(disabled=True)
+                sg.popup("Download stopped.")
+            else:
+                sg.popup_error("No active process to stop.")
         elif event == "-download-":
             if not values["URL"]:
                 sg.popup_error("Add a valid spotify link")
@@ -128,19 +156,23 @@ def main_gui() -> None:
                 if values["FFMPEG_ARGS"]
                 else ""
             )
+
+            Path(values["OUTPUT-DIRECTORY"]).mkdir(parents=True, exist_ok=True)
+
             command += (
                 f" --output \"{values['OUTPUT-DIRECTORY']}\""
                 if values["OUTPUT-DIRECTORY"]
                 else ""
             )
-            command += f" --threads {values['THREADS']}" if values["THREADS"] else ""
-            threading.Thread(
+
+            # command += f" --threads {values['THREADS']}" if values["THREADS"] else ""
+            task = threading.Thread(
                 target=exec_command,
                 args=(
                     command,
                     output_file,
                     window,
-                    True,
+                    True
                 ),
                 daemon=True,
             ).start()
@@ -160,7 +192,7 @@ def main_gui() -> None:
         if os.path.exists(output_file):
             current_size = os.path.getsize(output_file)
             if current_size != last_size:
-                with open(output_file, "r") as file:
+                with open(output_file, "r", encoding="utf-8") as file:
                     window["OUTPUT"].update(file.read())
                 last_size = current_size
     window.close()
