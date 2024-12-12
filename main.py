@@ -27,8 +27,10 @@ Version: 0.0.1
 Date: 12.02.2023
 """
 
+import ensurepip
 import os
 import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -37,8 +39,57 @@ from layout import sg, window
 current_process = None
 
 
+def ensure_pip():
+    """Ensure pip is installed. If not, install it using ensurepip."""
+    try:
+        # Check if pip is available
+        subprocess.run(
+            [sys.executable, "-m", "pip", "--version"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    # sg.popup_notify("pip is already installed.")
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        sg.popup_notify("pip is not installed. Installing pip...")
+        try:
+            ensurepip.bootstrap()
+            sg.popup_notify("pip installed successfully.")
+        except Exception as e:
+            sg.popup_error(f"Failed to install pip: {e}")
+            sys.exit(1)  # Exit the program if pip installation fails
+
+
+def check_and_install_spotdl():
+    """Check if spotdl is installed. If not, install it using pip."""
+    ensure_pip()  # Ensure pip is available
+    try:
+        # Check if spotdl is available
+        subprocess.run(
+            ["spotdl", "--version"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        # sg.popup_notify("spotdl is already installed.")
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        sg.popup_notify("spotdl is not installed. Installing now...")
+        try:
+            # Install spotdl using pip
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "spotdl"], check=True
+            )
+            sg.popup_notify("spotdl installed successfully.")
+        except subprocess.CalledProcessError as e:
+            sg.popup_error(f"Failed to install spotdl: {e}")
+            sys.exit(1)  # Exit the program if installation fails
+
+
 def exec_command(
-    commands: str, output_file, windows: sg.Window, dl: bool = True,
+    commands: str,
+    output_file,
+    windows: sg.Window,
+    dl: bool = True,
 ) -> None:
     """
     Executes a given command in a subprocess and handles output.
@@ -168,12 +219,7 @@ def main_gui() -> None:
             # command += f" --threads {values['THREADS']}" if values["THREADS"] else ""
             task = threading.Thread(
                 target=exec_command,
-                args=(
-                    command,
-                    output_file,
-                    window,
-                    True
-                ),
+                args=(command, output_file, window, True),
                 daemon=True,
             ).start()
 
@@ -199,4 +245,8 @@ def main_gui() -> None:
 
 
 if __name__ == "__main__":
-    threading.Thread(target=main_gui).start()
+    # Check if spotdl is installed
+    check_and_install_spotdl()
+
+    # Run the GUI in the main thread
+    main_gui()
