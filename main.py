@@ -191,33 +191,22 @@ def main_gui() -> None:
             if not values["URL"]:
                 sg.popup_error("Add a valid spotify link")
                 continue
-            command = f"spotdl {values['URL']}"
-            command += (
-                f" --audio {values['AUDIO_SOURCE']}" if values["AUDIO_SOURCE"] else ""
-            )
-            command += (
-                f" --lyrics {values['LYRICS_SOURCE']}"
-                if values["LYRICS_SOURCE"]
-                else ""
-            )
-            command += f" --format {values['FORMAT']}" if values["FORMAT"] else ""
-            command += f" --bitrate {values['BITRATE']}" if values["BITRATE"] else ""
-            command += (
-                f" --ffmpeg-args \"{values['FFMPEG_ARGS']}\""
-                if values["FFMPEG_ARGS"]
-                else ""
-            )
+            command = f"spotdl {values['URL']} --threads {os.cpu_count()-1} "
+            if values["AUDIO_SOURCE"]:
+                command += f" --audio {values['AUDIO_SOURCE']}"
+            if values["LYRICS_SOURCE"]:
+                command += f" --lyrics {values['LYRICS_SOURCE']}"
+            if values["FORMAT"]:
+                command += f" --format {values['FORMAT']}"
+            if values["BITRATE"]:
+                command += f" --bitrate {values['BITRATE']}"
+            if values["FFMPEG_ARGS"]:
+                command += f" --ffmpeg-args \"{values['FFMPEG_ARGS']}\""
+            if values["OUTPUT-DIRECTORY"]:
+                Path(values["OUTPUT-DIRECTORY"]).mkdir(parents=True, exist_ok=True)
+                command += f" --output \"{values['OUTPUT-DIRECTORY']}\""
 
-            Path(values["OUTPUT-DIRECTORY"]).mkdir(parents=True, exist_ok=True)
-
-            command += (
-                f" --output \"{values['OUTPUT-DIRECTORY']}\""
-                if values["OUTPUT-DIRECTORY"]
-                else ""
-            )
-
-            # command += f" --threads {values['THREADS']}" if values["THREADS"] else ""
-            task = threading.Thread(
+            threading.Thread(
                 target=exec_command,
                 args=(command, output_file, window, True),
                 daemon=True,
